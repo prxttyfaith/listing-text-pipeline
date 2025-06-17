@@ -44,7 +44,7 @@ def load_data_from_db(sample_size: int = 5_000):
     ilistings_df = pd.read_sql(sample_q, DB_URL)
     ilistings_df.to_csv("raw_subset/ilistings.csv", index=False)
 
-    # filter listing_tags on just those listing_ids
+    # # filter listing_tags on just those listing_ids
     listing_ids = ilistings_df["id"].tolist()
     ltags_q = text("""
     SELECT shop_id, listing_id, tag_id
@@ -55,7 +55,7 @@ def load_data_from_db(sample_size: int = 5_000):
     ilisting_tags_df = pd.read_sql(ltags_q, DB_URL, params={"ids": listing_ids})
     ilisting_tags_df.to_csv("raw_subset/ilisting_tags.csv", index=False)
 
-    # filter tags on just those tag_ids
+    # # filter tags on just those tag_ids
     tag_ids = ilisting_tags_df["tag_id"].unique().tolist()
     tags_q = text("""
     SELECT id, name
@@ -66,9 +66,11 @@ def load_data_from_db(sample_size: int = 5_000):
     itags_df = pd.read_sql(tags_q, DB_URL, params={"ids": tag_ids})
     itags_df.to_csv("raw_subset/itags.csv", index=False)
 
+    # return ilistings_df
     return ilistings_df, ilisting_tags_df, itags_df
 
 def clean_listings(df: pd.DataFrame) -> pd.DataFrame:
+    STOP_WORDS = {"a","an","and","the","in","on","for","with","to","of","is","it","this","that","as","at"}
     try:
         print("Cleaning listings...")
         df = df.dropna(subset=["title"])
@@ -77,6 +79,7 @@ def clean_listings(df: pd.DataFrame) -> pd.DataFrame:
             .str.lower()
             .str.replace(r"[^A-Za-z0-9\s]", "", regex=True)
             .str.strip()
+            .apply(lambda txt: ' '.join(word for word in txt.split() if word not in STOP_WORDS))
         )
         df.drop_duplicates(subset=["title"])
         print("Listings cleaned successfully.")
@@ -87,6 +90,7 @@ def clean_listings(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def clean_tags(df: pd.DataFrame) -> pd.DataFrame:
+    STOP_WORDS = {"a","an","and","the","in","on","for","with","to","of","is","it","this","that","as","at"}
     try:
         print("Cleaning tags...")
         df = df.dropna(subset=["name"])
@@ -95,6 +99,7 @@ def clean_tags(df: pd.DataFrame) -> pd.DataFrame:
                .str.lower()
                .str.replace(r"[^A-Za-z0-9\s]", "", regex=True)
                .str.strip()
+                .apply(lambda txt: ' '.join(word for word in txt.split() if word not in STOP_WORDS))
         )
         df.drop_duplicates(subset=["name"])
         print("Tags cleaned successfully.")
@@ -182,6 +187,7 @@ def main():
     test_connection()
     
     # LOAD
+    # ilistings_df = load_data_from_db(sample_size=5000)
     ilistings_df, ilisting_tags_df, itags_df = load_data_from_db(sample_size=5000)
  
     # CLEAN
@@ -201,7 +207,7 @@ def main():
     listing_with_tags_df.to_csv("final/listing_with_tags.csv", index=False)
     print(f"Saved listing_with_tags.csv ({listing_with_tags_df.shape})")
 
-    ilistings_clean_df    .to_csv("final/listings.csv",      index=False)
+    ilistings_clean_df.to_csv("final/listings.csv", index=False)
     ilisting_tags_clean_df.to_csv("final/listing_tags.csv", index=False)
     itags_clean_df        .to_csv("final/tags.csv",          index=False)
     print("Exported: listings.csv, listing_tags.csv, tags.csv")
