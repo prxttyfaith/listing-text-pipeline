@@ -65,7 +65,6 @@ def load_data_from_db(sample_size: int = 5_000):
 
 # def clean_data (df):
 # - remove null, lowercase, remove punctuations and special characters, remove stop words, remove duplicates based on title/name
-# clean ilistings and itags_df
 
 def clean_listings(df: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(subset=["title"])
@@ -114,6 +113,27 @@ def main():
     ilistings_clean_df     .to_csv("cleaned_subset/ilistings.csv",         index=False)
     ilisting_tags_clean_df .to_csv("cleaned_subset/ilisting_tags.csv", index=False)
     itags_clean_df         .to_csv("cleaned_subset/itags.csv",         index=False)
+    
+    # listing with tags
+    df_l = ilistings_clean_df[["id","shop_id","clean_title"]].rename(
+        columns={"id":"listing_id","clean_title":"listing_title"}
+    )
+    df_t = itags_clean_df[["id","clean_name"]].rename(
+        columns={"id":"tag_id","clean_name":"tag_name"}
+    )
+    listing_with_tags = (
+        df_l
+        .merge(ilisting_tags_clean_df, on="listing_id", how="inner")
+        .merge(df_t,                   on="tag_id",       how="inner")
+    )
+    # final exports
+    listing_with_tags.to_csv("final/listing_with_tags.csv", index=False)
+    print(f"🗂 listing_with_tags saved: {listing_with_tags.shape}")
+
+    ilistings_clean_df    .to_csv("final/listings.csv",      index=False)
+    ilisting_tags_clean_df.to_csv("final/listing_tags.csv", index=False)
+    itags_clean_df        .to_csv("final/tags.csv",          index=False)
+    print(" Exported: listings.csv, listing_tags.csv, tags.csv")
 
 if __name__ == "__main__":
     main()
