@@ -74,7 +74,7 @@ def clean_listings(df: pd.DataFrame) -> pd.DataFrame:
            .str.replace(r"[^A-Za-z0-9\s]", "", regex=True)
            .str.strip()
     )
-    return df.drop_duplicates(subset=["id"])
+    return df.drop_duplicates(subset=["title"])
 
 
 def clean_tags(df: pd.DataFrame) -> pd.DataFrame:
@@ -85,7 +85,7 @@ def clean_tags(df: pd.DataFrame) -> pd.DataFrame:
            .str.replace(r"[^A-Za-z0-9\s]", "", regex=True)
            .str.strip()
     )
-    return df.drop_duplicates(subset=["id"])
+    return df.drop_duplicates(subset=["name"])
 
 def clean_listing_tags(df: pd.DataFrame) -> pd.DataFrame:
     return df.drop_duplicates(subset=["shop_id", "listing_id", "tag_id"])
