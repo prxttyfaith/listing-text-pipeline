@@ -64,19 +64,56 @@ def load_data_from_db(sample_size: int = 5_000):
 
 
 # def clean_data (df):
-# - remove null, lowercase, remove punctuations and special characters, remove stop words, remove duplicates title/name
+# - remove null, lowercase, remove punctuations and special characters, remove stop words, remove duplicates based on title/name
+# clean ilistings and itags_df
+
+def clean_listings(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.dropna(subset=["title"])
+    df["clean_title"] = (
+        df["title"].astype(str)
+           .str.lower()
+           .str.replace(r"[^A-Za-z0-9\s]", "", regex=True)
+           .str.strip()
+    )
+    return df.drop_duplicates(subset=["id"])
 
 
+def clean_tags(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.dropna(subset=["name"])
+    df["clean_name"] = (
+        df["name"].astype(str)
+           .str.lower()
+           .str.replace(r"[^A-Za-z0-9\s]", "", regex=True)
+           .str.strip()
+    )
+    return df.drop_duplicates(subset=["id"])
+
+def clean_listing_tags(df: pd.DataFrame) -> pd.DataFrame:
+    return df.drop_duplicates(subset=["shop_id", "listing_id", "tag_id"])
+
+
+# From your listing with tags, create a subset of 200 random entries.  (200 * 199) / 2 pairs
 
     
 def main():
     test_connection()
+    
+    # load subset data from the database
     ilistings_df, ilisting_tags_df, itags_df = load_data_from_db(sample_size=5000)
 
-    # ilistings_df, itags_df, ilisting_tags_df = load_data_from_db()
+    ilistings_df .to_csv("raw_subset/ilistings.csv",         index=False)
+    ilisting_tags_df.to_csv("raw_subset/ilisting_tags.csv", index=False)
+    itags_df     .to_csv("raw_subste/itags.csv",             index=False)
+    print(f"📦 Raw saved: ilistings={ilistings_df.shape}, ilisting_tags={ilisting_tags_df.shape}, itags={itags_df.shape}")
+
     # clean data. pass df to functions 
-    
-    
+    ilistings_clean_df     = clean_listings(ilistings_df)
+    ilisting_tags_clean_df = clean_listing_tags(ilisting_tags_df)
+    itags_clean_df         = clean_tags(itags_df)
+
+    ilistings_clean_df     .to_csv("cleaned_subset/ilistings.csv",         index=False)
+    ilisting_tags_clean_df .to_csv("cleaned_subset/ilisting_tags.csv", index=False)
+    itags_clean_df         .to_csv("cleaned_subset/itags.csv",         index=False)
 
 if __name__ == "__main__":
     main()
