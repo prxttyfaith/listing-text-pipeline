@@ -2,6 +2,9 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
+from itertools import combinations
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 load_dotenv()
 
@@ -90,8 +93,26 @@ def clean_tags(df: pd.DataFrame) -> pd.DataFrame:
 def clean_listing_tags(df: pd.DataFrame) -> pd.DataFrame:
     return df.drop_duplicates(subset=["shop_id", "listing_id", "tag_id"])
 
+# listing with tags
+def build_listing_with_tags(ilistings_clean_df, ilisting_tags_clean_df, itags_clean_df):
+    # prepare listings and tags for merge
+    df_listings = ilistings_clean_df[["id", "shop_id", "clean_title"]].rename(
+        columns={"id": "listing_id", "clean_title": "listing_title"}
+    )
+    df_tags = itags_clean_df[["id", "clean_name"]].rename(
+        columns={"id": "tag_id", "clean_name": "tag_name"}
+    )
 
-# From your listing with tags, create a subset of 200 random entries.  (200 * 199) / 2 pairs
+    # merge into one “listing_with_tags” table
+    listing_with_tags_df = (
+        df_listings
+        .merge(ilisting_tags_clean_df, on="listing_id", how="inner")
+        .merge(df_tags,                 on="tag_id",       how="inner")
+    )
+
+    return listing_with_tags_df
+
+# pairwise features based on listing_with_tags_df
 
     
 def main():
@@ -109,26 +130,16 @@ def main():
     ilistings_clean_df     = clean_listings(ilistings_df)
     ilisting_tags_clean_df = clean_listing_tags(ilisting_tags_df)
     itags_clean_df         = clean_tags(itags_df)
-
-    ilistings_clean_df     .to_csv("cleaned_subset/ilistings.csv",         index=False)
-    ilisting_tags_clean_df .to_csv("cleaned_subset/ilisting_tags.csv", index=False)
-    itags_clean_df         .to_csv("cleaned_subset/itags.csv",         index=False)
     
     # listing with tags
-    df_l = ilistings_clean_df[["id","shop_id","clean_title"]].rename(
-        columns={"id":"listing_id","clean_title":"listing_title"}
+    listing_with_tags_df = build_listing_with_tags(
+        ilistings_clean_df,
+        ilisting_tags_clean_df,
+        itags_clean_df
     )
-    df_t = itags_clean_df[["id","clean_name"]].rename(
-        columns={"id":"tag_id","clean_name":"tag_name"}
-    )
-    listing_with_tags = (
-        df_l
-        .merge(ilisting_tags_clean_df, on="listing_id", how="inner")
-        .merge(df_t,                   on="tag_id",       how="inner")
-    )
-    # final exports
-    listing_with_tags.to_csv("final/listing_with_tags.csv", index=False)
-    print(f"🗂 listing_with_tags saved: {listing_with_tags.shape}")
+
+    listing_with_tags_df.to_csv("final/listing_with_tags.csv", index=False)
+    print(f"🗂 Saved listing_with_tags.csv ({listing_with_tags_df.shape})")
 
     ilistings_clean_df    .to_csv("final/listings.csv",      index=False)
     ilisting_tags_clean_df.to_csv("final/listing_tags.csv", index=False)
