@@ -32,37 +32,34 @@ def test_connection():
         
 # load_data_from_db:
 def load_data_from_db():
-    print(f"Loading raw data ...")
-    os.makedirs("raw_subset",    exist_ok=True)
-    # sample the listings table
+    print(f"Loading data ...")
+
+    print("  - Fetching ilistings_clean...")
     sample_q = f"""
     SELECT id, shop_id, title
       FROM interns.ilistings_clean
     """
-    print("  - Fetching ilistings_clean...")
     ilistings_df = pd.read_sql(sample_q, DB_URL)
-    ilistings_df.to_csv("raw_subset/ilistings.csv", index=False)
-    # # filter listing_tags on just those listing_ids
+    print(f"  - Fetched {ilistings_df.shape[0]} listings")
+
     listing_ids = ilistings_df["id"].tolist()
-    
+
+    print("  - Fetching ilisting_tags_clean...")  
     ltags_q = text("""
     SELECT shop_id, listing_id, tag_id
       FROM interns.ilisting_tags_clean
     """)
-    print("  - Fetching ilisting_tags_clean...")
     ilisting_tags_df = pd.read_sql(ltags_q, DB_URL, params={"ids": listing_ids})
-    ilisting_tags_df.to_csv("raw_subset/ilisting_tags.csv", index=False)
+    print(f"  - Fetched {ilistings_df.shape[0]} listings")
 
-    # # filter tags on just those tag_ids
     print("  - Fetching itags_clean")
     tags_q = text("""
     SELECT id, name
       FROM interns.itags_clean
     """)
     itags_df = pd.read_sql(tags_q, DB_URL)
-    itags_df.to_csv("raw_subset/itags.csv", index=False)
+    print(f"  - Fetched {ilistings_df.shape[0]} listings")
 
-    # return ilistings_df
     return ilistings_df, ilisting_tags_df, itags_df
 
 # listing with tags
@@ -191,7 +188,7 @@ def main():
     )
     print(f"Shapes → train: {train_df.shape}, val: {val_df.shape}, test: {test_df.shape}")
     
-    # 5. export all cleaned data
+    # 5. export all data
     ilistings_clean_df.to_csv("final/listings.csv", index=False)
     ilisting_tags_clean_df.to_csv("final/listing_tags.csv", index=False)
     itags_clean_df.to_csv("final/tags.csv",          index=False)
