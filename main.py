@@ -30,97 +30,50 @@ def test_connection():
         print("Connection failed:", e)
         
 # load_data_from_db:
-def load_data_from_db(sample_size: int = 5_000):
-    print(f"Loading raw data (sample_size={sample_size})...")
+def load_data_from_db():
+    print(f"Loading raw data ...")
     os.makedirs("raw_subset",    exist_ok=True)
     # sample the listings table
     sample_q = f"""
     SELECT id, shop_id, title
-      FROM global.listings
-      TABLESAMPLE SYSTEM (1)
-    LIMIT {sample_size};
+      FROM interns.ilistings_clean
     """
-    print("  - Fetching listings...")
+    print("  - Fetching ilistings_clean...")
     ilistings_df = pd.read_sql(sample_q, DB_URL)
     ilistings_df.to_csv("raw_subset/ilistings.csv", index=False)
-
     # # filter listing_tags on just those listing_ids
     listing_ids = ilistings_df["id"].tolist()
+    
     ltags_q = text("""
     SELECT shop_id, listing_id, tag_id
-      FROM global.listing_tags
-     WHERE listing_id = ANY(:ids)
+      FROM interns.ilisting_tags_clean
     """)
-    print("  - Fetching listing_tags...")
+    print("  - Fetching ilisting_tags_clean...")
     ilisting_tags_df = pd.read_sql(ltags_q, DB_URL, params={"ids": listing_ids})
     ilisting_tags_df.to_csv("raw_subset/ilisting_tags.csv", index=False)
 
     # # filter tags on just those tag_ids
-    tag_ids = ilisting_tags_df["tag_id"].unique().tolist()
+    print("  - Fetching itags_clean")
     tags_q = text("""
     SELECT id, name
-      FROM global.tags
-     WHERE id = ANY(:ids)
+      FROM interns.itags_clean
     """)
-    print("  - Fetching tags...")
-    itags_df = pd.read_sql(tags_q, DB_URL, params={"ids": tag_ids})
+    itags_df = pd.read_sql(tags_q, DB_URL)
     itags_df.to_csv("raw_subset/itags.csv", index=False)
 
     # return ilistings_df
     return ilistings_df, ilisting_tags_df, itags_df
-
-def clean_listings(df: pd.DataFrame) -> pd.DataFrame:
-    STOP_WORDS = {"a","an","and","the","in","on","for","with","to","of","is","it","this","that","as","at"}
-    try:
-        print("Cleaning listings...")
-        df = df.dropna(subset=["title"])
-        df["clean_title"] = (
-            df["title"].astype(str)
-            .str.lower()
-            .str.replace(r"[^A-Za-z0-9\s]", "", regex=True)
-            .str.strip()
-            .apply(lambda txt: ' '.join(word for word in txt.split() if word not in STOP_WORDS))
-        )
-        df.drop_duplicates(subset=["title"])
-        print("Listings cleaned successfully.")
-        return df
-    except Exception as e:
-        print(f"Error cleaning listings: {e}")
-        return df
-
-
-def clean_tags(df: pd.DataFrame) -> pd.DataFrame:
-    STOP_WORDS = {"a","an","and","the","in","on","for","with","to","of","is","it","this","that","as","at"}
-    try:
-        print("Cleaning tags...")
-        df = df.dropna(subset=["name"])
-        df["clean_name"] = (
-            df["name"].astype(str)
-               .str.lower()
-               .str.replace(r"[^A-Za-z0-9\s]", "", regex=True)
-               .str.strip()
-                .apply(lambda txt: ' '.join(word for word in txt.split() if word not in STOP_WORDS))
-        )
-        df.drop_duplicates(subset=["name"])
-        print("Tags cleaned successfully.")
-        return df
-    except Exception as e:
-        print(f"Error cleaning tags: {e}")
-        return df
-
-def clean_listing_tags(df: pd.DataFrame) -> pd.DataFrame:
-    return df.drop_duplicates(subset=["shop_id", "listing_id", "tag_id"])
 
 # listing with tags
 def build_listing_with_tags(ilistings_clean_df, ilisting_tags_clean_df, itags_clean_df):
     try: 
         print("Building listing_with_tags DataFrame...")
         # prepare listings and tags for merge
-        df_listings = ilistings_clean_df[["id", "shop_id", "clean_title"]].rename(
-            columns={"id": "listing_id", "clean_title": "listing_title"}
+        df_listings = ilistings_clean_df[["id", "shop_id", "title"]].rename(
+            columns={"id": "listing_id", "title": "listing_title"}
         )
-        df_tags = itags_clean_df[["id", "clean_name"]].rename(
-            columns={"id": "tag_id", "clean_name": "tag_name"}
+        df_tags = itags_clean_df[["id", "name"]].rename(
+            columns={"id": "tag_id", "name": "tag_name"}
         )
 
         # merge into one “listing_with_tags” table
@@ -186,32 +139,25 @@ def create_pairwise_features(listing_with_tags_df, sample_n: int = 200):
 def main():
     test_connection()
     
-    # LOAD
-    # ilistings_df = load_data_from_db(sample_size=5000)
-    ilistings_df, ilisting_tags_df, itags_df = load_data_from_db(sample_size=5000)
- 
-    # CLEAN
-    ilistings_clean_df     = clean_listings(ilistings_df)
-    ilisting_tags_clean_df = clean_listing_tags(ilisting_tags_df)
-    itags_clean_df         = clean_tags(itags_df)
-    
-    # listing with tags
+    # load
+    ilistings_clean_df, ilisting_tags_clean_df, itags_clean_df = load_data_from_db()
+
+    # create listing with tags
     listing_with_tags_df = build_listing_with_tags(
         ilistings_clean_df,
         ilisting_tags_clean_df,
         itags_clean_df
     )
-    
-    # EXPORT FINAL .CSV
+    # export final csv files
     os.makedirs("final",          exist_ok=True)
     listing_with_tags_df.to_csv("final/listing_with_tags.csv", index=False)
     print(f"Saved listing_with_tags.csv ({listing_with_tags_df.shape})")
 
     ilistings_clean_df.to_csv("final/listings.csv", index=False)
     ilisting_tags_clean_df.to_csv("final/listing_tags.csv", index=False)
-    itags_clean_df        .to_csv("final/tags.csv",          index=False)
+    itags_clean_df.to_csv("final/tags.csv",          index=False)
     print("Exported: listings.csv, listing_tags.csv, tags.csv")
-    
+
     # pairwise features based on listing_with_tags_df
     pairs_df = create_pairwise_features(listing_with_tags_df, sample_n=200)
     pairs_df.to_csv("final/pairwise_features.csv", index=False)
