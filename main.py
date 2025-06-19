@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, text
 from itertools import combinations
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.model_selection import train_test_split
 
 load_dotenv()
 
@@ -135,6 +136,28 @@ def create_pairwise_features(listing_with_tags_df, sample_n: int = 200):
     except Exception as e:
         print(f"Error creating pairwise features: {e}")
         return pd.DataFrame()
+
+    
+def split_and_label(pairs_df, cos_threshold=0.5, jac_threshold=0.3, random_state=42):
+
+    # Label = 1 if (cosine_sim >= cos_threshold) AND (jaccard_sim >= jac_threshold),
+    # then stratified split into train (60%), val (20%), test (20%).
+
+    df = pairs_df.copy()
+    df['label'] = (
+        (df['cosine_sim'] >= cos_threshold) &
+        (df['jaccard_sim'] >= jac_threshold)
+    ).astype(int)
+
+    # 20% hold-out for test
+    train_val, test = train_test_split(
+        df, test_size=0.20, random_state=random_state, stratify=df['label']
+    )
+    # of the remaining 80%, 25% → val (so val=20% total, train=60% total)
+    train, val = train_test_split(
+        train_val, test_size=0.25, random_state=random_state, stratify=train_val['label']
+    )
+    return train, val, test
 
 def main():
     test_connection()
