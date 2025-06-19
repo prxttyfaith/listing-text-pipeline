@@ -78,12 +78,14 @@ def clean_listings(df: pd.DataFrame) -> pd.DataFrame:
     STOP_WORDS = {"a","an","and","the","in","on","for","with","to","of","is","it","this","that","as","at"}
     try:
         print(" - Cleaning listings...")
-        print(f"    rows: {len(df)}")     
-        # 1) Drop real NaNs
-        print("     > dropping NaN and empty titles")
+        print(f"    rows: {len(df)}")
+        # 1) Drop NaNs and empty titles
+        print("     > dropping Null and empty titles")
         df = df.dropna(subset=["title"])
         df = df[df["title"].astype(str).str.strip() != ""].copy()
-        print(f"    rows: {len(df)}")    
+        print(f"    rows: {len(df)}")   
+        
+        # 2) Normalize titles → clean_title 
         print("     > normalizing titles -> clean_title")
         df["clean_title"] = (
             df["title"].astype(str)
@@ -93,17 +95,17 @@ def clean_listings(df: pd.DataFrame) -> pd.DataFrame:
             .str.strip()
             .apply(lambda txt: ' '.join(word for word in txt.split() if word not in STOP_WORDS))
         )
-        # !!!! DROP AGAIN THE EMPTY CLEANED TITLE
+        # 3) Drop any rows where clean_title became empty
         print("     > dropping empty cleaned_titles")
         df = df[df["clean_title"].astype(str).str.strip() != ""].copy()
         print(f"    rows: {len(df)}")    
 
-        #language filter
+        # 4) Language filter
         print("     > Filtering for English titles…")
         df = df[df["clean_title"].apply(is_english)]
-        print(f"    rows: {len(df)}")     
-        
-        # 2) Drop duplicates based on the cleaned title
+        print(f"    rows: {len(df)}")
+
+        # 5) Drop duplicates based on the cleaned title
         print("     > dropping duplicates based on clean_title")
         df = df.drop_duplicates(subset=['clean_title'], keep='first')
         print(f"    rows: {len(df)}")    
@@ -166,15 +168,15 @@ def clean_tags(df: pd.DataFrame) -> pd.DataFrame:
         df = df[df["clean_name"].astype(str).str.strip() != ""].copy()
         print(f"    rows: {len(df)}")
         
-        # 4) Language filter
-        print("     > Filtering for English names…")
-        df = df[df["clean_name"].apply(is_english)]
-        print(f"    rows: {len(df)}")
+        # # 4) Language filter
+        # print("     > Filtering for English names…")
+        # df = df[df["clean_name"].apply(is_english)]
+        # print(f"    rows: {len(df)}")
         
-        # 5) Drop duplicates, keep first
-        print("     > dropping duplicates based on clean_name")
-        df = df.drop_duplicates(subset=["clean_name"], keep="first")
-        print(f"    rows: {len(df)}")
+        # # 5) Drop duplicates, keep first
+        # print("     > dropping duplicates based on clean_name")
+        # df = df.drop_duplicates(subset=["clean_name"], keep="first")
+        # print(f"    rows: {len(df)}")
         
         print("Tags cleaned successfully.")
         return df
