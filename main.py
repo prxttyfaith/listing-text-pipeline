@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, text
 from itertools import combinations
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.model_selection import train_test_split
 
 load_dotenv()
 
@@ -31,37 +32,34 @@ def test_connection():
         
 # load_data_from_db:
 def load_data_from_db():
-    print(f"Loading raw data ...")
-    os.makedirs("raw_subset",    exist_ok=True)
-    # sample the listings table
+    print(f"Loading data ...")
+
+    print("  - Fetching ilistings_clean...")
     sample_q = f"""
     SELECT id, shop_id, title
       FROM interns.ilistings_clean
     """
-    print("  - Fetching ilistings_clean...")
     ilistings_df = pd.read_sql(sample_q, DB_URL)
-    ilistings_df.to_csv("raw_subset/ilistings.csv", index=False)
-    # # filter listing_tags on just those listing_ids
+    print(f"  - Fetched {ilistings_df.shape[0]} listings")
+
     listing_ids = ilistings_df["id"].tolist()
-    
+
+    print("  - Fetching ilisting_tags_clean...")  
     ltags_q = text("""
     SELECT shop_id, listing_id, tag_id
       FROM interns.ilisting_tags_clean
     """)
-    print("  - Fetching ilisting_tags_clean...")
     ilisting_tags_df = pd.read_sql(ltags_q, DB_URL, params={"ids": listing_ids})
-    ilisting_tags_df.to_csv("raw_subset/ilisting_tags.csv", index=False)
+    print(f"  - Fetched {ilistings_df.shape[0]} listings")
 
-    # # filter tags on just those tag_ids
     print("  - Fetching itags_clean")
     tags_q = text("""
     SELECT id, name
       FROM interns.itags_clean
     """)
     itags_df = pd.read_sql(tags_q, DB_URL)
-    itags_df.to_csv("raw_subset/itags.csv", index=False)
+    print(f"  - Fetched {ilistings_df.shape[0]} listings")
 
-    # return ilistings_df
     return ilistings_df, ilisting_tags_df, itags_df
 
 # listing with tags
@@ -136,32 +134,70 @@ def create_pairwise_features(listing_with_tags_df, sample_n: int = 200):
         print(f"Error creating pairwise features: {e}")
         return pd.DataFrame()
 
+    
+def split_and_label(pairs_df, cos_threshold=0.5, jac_threshold=0.3, random_state=42):
+
+    # Label = 1 if (cosine_sim >= cos_threshold) AND (jaccard_sim >= jac_threshold),
+    # then stratified split into train (60%), val (20%), test (20%).
+
+    df = pairs_df.copy()
+    df['label'] = (
+        (df['cosine_sim'] >= cos_threshold) &
+        (df['jaccard_sim'] >= jac_threshold)
+    ).astype(int)
+
+    # 20% hold-out for test
+    train_val, test = train_test_split(
+        df, test_size=0.20, random_state=random_state, stratify=df['label']
+    )
+    # of the remaining 80%, 25% → val (so val=20% total, train=60% total)
+    train, val = train_test_split(
+        train_val, test_size=0.25, random_state=random_state, stratify=train_val['label']
+    )
+    return train, val, test
+
 def main():
     test_connection()
+    os.makedirs("final",          exist_ok=True)
+    os.makedirs("split_data", exist_ok=True)
     
-    # load
+    # 1. load cleaned data from database
     ilistings_clean_df, ilisting_tags_clean_df, itags_clean_df = load_data_from_db()
 
-    # create listing with tags
+    # 2. create listing with tags
     listing_with_tags_df = build_listing_with_tags(
         ilistings_clean_df,
         ilisting_tags_clean_df,
         itags_clean_df
     )
-    # export final csv files
-    os.makedirs("final",          exist_ok=True)
+    # 2.a export listing_with_tags.csv
     listing_with_tags_df.to_csv("final/listing_with_tags.csv", index=False)
     print(f"Saved listing_with_tags.csv ({listing_with_tags_df.shape})")
 
+
+    # 3. pairwise features based on listing_with_tags_df
+    pairs_df = create_pairwise_features(listing_with_tags_df, sample_n=200)
+    pairs_df.to_csv("final/pairwise_features.csv", index=False)
+    print(f" Saved pairwise_features.csv ({pairs_df.shape})") 
+
+    # 4) label using both metrics + split
+    train_df, val_df, test_df = split_and_label(
+        pairs_df,
+        cos_threshold=0.5,
+        jac_threshold=0.3
+    )
+    print(f"Shapes → train: {train_df.shape}, val: {val_df.shape}, test: {test_df.shape}")
+    
+    # 5. export all data
     ilistings_clean_df.to_csv("final/listings.csv", index=False)
     ilisting_tags_clean_df.to_csv("final/listing_tags.csv", index=False)
     itags_clean_df.to_csv("final/tags.csv",          index=False)
     print("Exported: listings.csv, listing_tags.csv, tags.csv")
-
-    # pairwise features based on listing_with_tags_df
-    pairs_df = create_pairwise_features(listing_with_tags_df, sample_n=200)
-    pairs_df.to_csv("final/pairwise_features.csv", index=False)
-    print(f" Saved pairwise_features.csv ({pairs_df.shape})")
+    
+    train_df.to_csv("split_data/pairwise_train.csv", index=False)
+    val_df.to_csv(  "split_data/pairwise_val.csv",   index=False)
+    test_df.to_csv("split_data/pairwise_test.csv",  index=False)
+    print("All splits saved as CSV in ./split_data/")
 
 if __name__ == "__main__":
     main()
