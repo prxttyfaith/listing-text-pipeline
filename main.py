@@ -161,30 +161,46 @@ def split_and_label(pairs_df, cos_threshold=0.5, jac_threshold=0.3, random_state
 
 def main():
     test_connection()
+    os.makedirs("final",          exist_ok=True)
+    os.makedirs("split_data", exist_ok=True)
     
-    # load
+    # 1. load cleaned data from database
     ilistings_clean_df, ilisting_tags_clean_df, itags_clean_df = load_data_from_db()
 
-    # create listing with tags
+    # 2. create listing with tags
     listing_with_tags_df = build_listing_with_tags(
         ilistings_clean_df,
         ilisting_tags_clean_df,
         itags_clean_df
     )
-    # export final csv files
-    os.makedirs("final",          exist_ok=True)
+    # 2.a export listing_with_tags.csv
     listing_with_tags_df.to_csv("final/listing_with_tags.csv", index=False)
     print(f"Saved listing_with_tags.csv ({listing_with_tags_df.shape})")
 
-    # pairwise features based on listing_with_tags_df
+
+    # 3. pairwise features based on listing_with_tags_df
     pairs_df = create_pairwise_features(listing_with_tags_df, sample_n=200)
     pairs_df.to_csv("final/pairwise_features.csv", index=False)
     print(f" Saved pairwise_features.csv ({pairs_df.shape})") 
+
+    # 4) label using both metrics + split
+    train_df, val_df, test_df = split_and_label(
+        pairs_df,
+        cos_threshold=0.5,
+        jac_threshold=0.3
+    )
+    print(f"Shapes → train: {train_df.shape}, val: {val_df.shape}, test: {test_df.shape}")
     
-    # ilistings_clean_df.to_csv("final/listings.csv", index=False)
-    # ilisting_tags_clean_df.to_csv("final/listing_tags.csv", index=False)
-    # itags_clean_df.to_csv("final/tags.csv",          index=False)
-    # print("Exported: listings.csv, listing_tags.csv, tags.csv")
+    # 5. export all cleaned data
+    ilistings_clean_df.to_csv("final/listings.csv", index=False)
+    ilisting_tags_clean_df.to_csv("final/listing_tags.csv", index=False)
+    itags_clean_df.to_csv("final/tags.csv",          index=False)
+    print("Exported: listings.csv, listing_tags.csv, tags.csv")
+    
+    train_df.to_csv("split_data/pairwise_train.csv", index=False)
+    val_df.to_csv(  "split_data/pairwise_val.csv",   index=False)
+    test_df.to_csv("split_data/pairwise_test.csv",  index=False)
+    print("All splits saved as CSV in ./split_data/")
 
 if __name__ == "__main__":
     main()
