@@ -153,15 +153,15 @@ def main():
     listing_with_tags_df.to_csv("final/listing_with_tags.csv", index=False)
     print(f"Saved listing_with_tags.csv ({listing_with_tags_df.shape})")
 
-    ilistings_clean_df.to_csv("final/listings.csv", index=False)
-    ilisting_tags_clean_df.to_csv("final/listing_tags.csv", index=False)
-    itags_clean_df.to_csv("final/tags.csv",          index=False)
-    print("Exported: listings.csv, listing_tags.csv, tags.csv")
-
     # pairwise features based on listing_with_tags_df
     pairs_df = create_pairwise_features(listing_with_tags_df, sample_n=200)
     pairs_df.to_csv("final/pairwise_features.csv", index=False)
-    print(f" Saved pairwise_features.csv ({pairs_df.shape})")
+    print(f" Saved pairwise_features.csv ({pairs_df.shape})") 
+    
+    # ilistings_clean_df.to_csv("final/listings.csv", index=False)
+    # ilisting_tags_clean_df.to_csv("final/listing_tags.csv", index=False)
+    # itags_clean_df.to_csv("final/tags.csv",          index=False)
+    # print("Exported: listings.csv, listing_tags.csv, tags.csv")
 
 if __name__ == "__main__":
     main()
